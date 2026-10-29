@@ -107,7 +107,12 @@ export default function Home() {
   // the page source or DOM. See STEP 03 below.
 
   // ─── Calendar helpers (calendar removed — date shown in event details card) ─
-  const eventDate = new Date(EVENT.date + 'T00:00:00')
+  // The Sheet's Event_Config tab returns the date as a verbose Date.toString()
+  // string (e.g. "Sat Nov 07 2026 00:00:00 GMT+0530 (India Standard Time)")
+  // because Google Sheets auto-converts "2026-11-07" cells to Date objects.
+  // new Date(EVENT.date) handles both verbose + ISO formats correctly.
+  // (Don't append "T00:00:00" — that breaks the verbose format.)
+  const eventDate = new Date(EVENT.date)
 
   // ─── Form submission ───────────────────────────────────────────────────────
   const showStatus = (html: string, kind: StatusKind) => {
