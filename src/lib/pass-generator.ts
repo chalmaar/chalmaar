@@ -2,23 +2,19 @@
  * ════════════════════════════════════════════════════════════════════════════
  *  src/lib/pass-generator.ts
  *
- *  Generates the final guest pass image: a tier-colored template (pre-built
- *  in /public/templates/) with a signed QR composited on top, plus the guest's
- *  name + booking ID overlaid as SVG text.
+ *  Generates the final guest pass image:
+ *    - Uses the event poster (public/templates/main_poster.jpg, 1200×1500) as background
+ *    - Places a large signed QR (480×480) centered horizontally, just below the
+ *      "DIWALI Party PASSES LIVE" text (which ends at y=980 per VLM analysis)
+ *    - White rounded rectangle behind the QR for visibility
+ *    - Small pass-type label below the QR (e.g. "COUPLE PASS")
+ *    - Nothing else — no guest name, no booking ID, no "SCAN AT GATE" text
  *
  *  The signed QR encodes  "<bookingId>:<hmac>"  where hmac is the first 16 hex
- *  chars of HMAC-SHA256(bookingId, QR_SIGNING_SECRET). Telegram gate-scan flow:
- *    1. Bouncer sends photo of the guest's pass to the Telegram bot
- *    2. Server decodes the QR via jsqr → extracts (bookingId, hmac)
- *    3. Server recomputes hmac with QR_SIGNING_SECRET → if match, valid signature
- *    4. Server queries Sheet (getBookingById) → checks Status=APPROVED,
- *       Checked In=FALSE → flips Checked In=TRUE
- *    5. Server replies "🟢 VALID — Name — Checked In" or "🔴 INVALID: reason"
+ *  chars of HMAC-SHA256(bookingId, QR_SIGNING_SECRET).
  *
  *  ENV VARS:
- *    QR_SIGNING_SECRET — long random string, used for HMAC. Must be the same
- *                        on the FC layer (after redeploy) for the signature
- *                        verification to work at the gate.
+ *    QR_SIGNING_SECRET — long random string, used for HMAC.
  * ════════════════════════════════════════════════════════════════════════════
  */
 
@@ -27,19 +23,24 @@ import crypto from 'node:crypto'
 import QRCode from 'qrcode'
 import sharp from 'sharp'
 
-// ─── Tier → template filename map ──────────────────────────────────────────
-const TIER_TEMPLATES: Record<string, string> = {
-  'Female Pass': 'female_pass.jpg',
-  'Male Pass': 'male_pass.jpg',
-  'Couple Pass': 'couple_pass.jpg',
-  'Standing Table': 'standing_table.jpg',
-  'Seating Table': 'seating_table.jpg',
-}
+// ─── Layout (poster is 1200×1500) ──────────────────────────────────────────
+const POSTER_W = 1200
+const POSTER_H = 1500
 
-// QR zone on the templates — matches scripts/gen_pass_templates.py
-const QR_TOP = 920
-const QR_LEFT = 380
-const QR_SIZE = 320
+// QR size — doubled from 240 to 480 per user request
+const QR_SIZE = 480
+
+// QR position — centered horizontally, just below "DIWALI Party PASSES LIVE"
+// text (VLM analysis: the text's yellow frame bottom is at y=980)
+const QR_LEFT = (POSTER_W - QR_SIZE) / 2  // (1200 - 480) / 2 = 360
+const QR_TOP = 1000                        // 20px gap below the text
+
+// White rounded rectangle behind the QR (for visibility against busy background)
+const QR_BG_PADDING = 15
+const QR_BG_SIZE = QR_SIZE + QR_BG_PADDING * 2  // 510
+
+// Pass-type label — small text below the QR
+const LABEL_TOP = QR_TOP + QR_SIZE + 8  // y = 1488
 
 // ─── Signed-QR helpers ──────────────────────────────────────────────────────
 function getSigningSecret(): string {
@@ -75,7 +76,6 @@ export interface QrValidation {
 
 /** Validate a decoded QR payload. Returns bookingId on success. */
 export function validateSignedQrPayload(raw: string): QrValidation {
-  // Format: "csn-xxxxxxxxxxxx:hmac16hex"
   const parts = raw.split(':')
   if (parts.length !== 2) {
     return { ok: false, error: 'MALFORMED' }
@@ -108,7 +108,7 @@ async function renderQrPng(text: string): Promise<Buffer> {
   })
 }
 
-// ─── SVG text overlay (name + booking ID) ──────────────────────────────────
+// ─── SVG overlays ───────────────────────────────────────────────────────────
 function escapeXml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -118,18 +118,23 @@ function escapeXml(s: string): string {
     .replace(/'/g, '&apos;')
 }
 
-function buildTextOverlay(name: string, bookingId: string): Buffer {
-  // Empty space between y=640 (price) and y=920 (QR top) — place name + ID here.
-  const svg = `<svg width="1080" height="240" xmlns="http://www.w3.org/2000/svg">
-    <text x="540" y="90" text-anchor="middle"
+// White rounded rectangle behind the QR
+function buildQrBackground(): Buffer {
+  const svg = `<svg width="${QR_BG_SIZE}" height="${QR_BG_SIZE}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="${QR_BG_SIZE}" height="${QR_BG_SIZE}" rx="16" ry="16" fill="#FFFFFF" />
+  </svg>`
+  return Buffer.from(svg, 'utf-8')
+}
+
+// Pass-type label (small, centered, below the QR)
+function buildPassTypeLabel(tier: string): Buffer {
+  const labelHeight = 20
+  const svg = `<svg width="${POSTER_W}" height="${labelHeight}" xmlns="http://www.w3.org/2000/svg">
+    <text x="${POSTER_W / 2}" y="${labelHeight - 4}" text-anchor="middle"
           font-family="DejaVu Sans, Arial, sans-serif"
-          font-size="56" font-weight="bold" fill="#121212">
-      ${escapeXml(name.toUpperCase())}
-    </text>
-    <text x="540" y="180" text-anchor="middle"
-          font-family="DejaVu Sans Mono, monospace"
-          font-size="24" fill="#121212" letter-spacing="2">
-      ${escapeXml(bookingId)}
+          font-size="16" font-weight="bold" fill="#FFFFFF"
+          stroke="#000000" stroke-width="0.5">
+      ${escapeXml(tier.toUpperCase())}
     </text>
   </svg>`
   return Buffer.from(svg, 'utf-8')
@@ -140,6 +145,7 @@ export interface GeneratePassInput {
   bookingId: string
   name: string
   passTier: string
+  quantity?: number
 }
 
 export interface GeneratePassOutput {
@@ -148,39 +154,41 @@ export interface GeneratePassOutput {
 }
 
 /**
- * Generate the final pass JPG. Throws if the tier has no template file or
- * if QR_SIGNING_SECRET is unset.
+ * Generate the final pass JPG using the event poster as the background.
+ * Throws if the poster file is missing or QR_SIGNING_SECRET is unset.
  */
 export async function generatePass(
   input: GeneratePassInput
 ): Promise<GeneratePassOutput> {
-  const templateFile = TIER_TEMPLATES[input.passTier]
-  if (!templateFile) {
-    throw new Error(
-      `No template for tier "${input.passTier}". Known tiers: ${Object.keys(TIER_TEMPLATES).join(', ')}`
-    )
-  }
-  const templatePath = path.join(
+  const posterPath = path.join(
     process.cwd(),
     'public',
     'templates',
-    templateFile
+    'main_poster.jpg'
   )
 
   const qrPayload = buildSignedQrPayload(input.bookingId)
-  const [qrBuffer, textOverlay] = await Promise.all([
+
+  const [qrBuffer, qrBackground, passTypeLabel] = await Promise.all([
     renderQrPng(qrPayload),
-    Promise.resolve(buildTextOverlay(input.name, input.bookingId)),
+    Promise.resolve(buildQrBackground()),
+    Promise.resolve(buildPassTypeLabel(input.passTier)),
   ])
 
-  const buffer = await sharp(templatePath)
+  const buffer = await sharp(posterPath)
     .composite([
-      // Text overlay sits in the empty band between price (y=640) and QR (y=920)
-      { input: textOverlay, top: 660, left: 0 },
-      // QR zone at (380, 920), 320×320
+      // 1. White rounded rectangle behind the QR (centered, just below the text)
+      {
+        input: qrBackground,
+        top: QR_TOP - QR_BG_PADDING,
+        left: QR_LEFT - QR_BG_PADDING,
+      },
+      // 2. QR code on top of the white rectangle
       { input: qrBuffer, top: QR_TOP, left: QR_LEFT },
+      // 3. Pass-type label below the QR (centered)
+      { input: passTypeLabel, top: LABEL_TOP, left: 0 },
     ])
-    .jpeg({ quality: 85 })
+    .jpeg({ quality: 90 })
     .toBuffer()
 
   return { buffer, mimeType: 'image/jpeg' }
