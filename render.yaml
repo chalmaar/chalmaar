@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: csn-events
+    runtime: node
+    plan: free
+    buildCommand: bun install && bun run build
+    startCommand: bun .next/standalone/server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APPS_SCRIPT_WEBHOOK_URL
+        sync: false
+      - key: APPS_SCRIPT_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_ID
+        sync: false
+      - key: QR_SIGNING_SECRET
+        sync: false
+        sync: false
