@@ -59,6 +59,7 @@ import {
 } from '@/lib/db'
 import {
   generatePass,
+  signBookingId,
   validateSignedQrPayload,
 } from '@/lib/pass-generator'
 
@@ -199,8 +200,6 @@ async function handleApprove(
       `Booking ID: <code>${escapeHtml(booking.id)}</code>\n\n` +
       `Below is the pass image — forward it to the guest's WhatsApp.`
 
-    // The Pass URL isn't public — there's no /api/pass/[id] route. The pass
-    // image is only ever in this Telegram chat + wherever the admin forwards it.
     const keyboard = whatsappShareKeyboard(booking.phone)
 
     if (cq.message.message_id) {
@@ -222,6 +221,14 @@ async function handleApprove(
       `Booking ID: <code>${escapeHtml(booking.id)}</code>`,
       keyboard
     )
+
+    // 6. Store the SIGNED pass URL in the Sheet (sig prevents IDOR)
+    const publicUrl = process.env.PUBLIC_URL || 'https://csnevents.onrender.com'
+    const sig = signBookingId(booking.id)
+    const passUrl = `${publicUrl}/api/pass/${booking.id}?sig=${sig}`
+    await updateBooking(booking.id, { passFileId: passUrl }).catch((err: Error) => {
+      console.error('[handleApprove] updateBooking passFileId failed:', err)
+    })
   } catch (err) {
     console.error('[handleApprove] error:', err)
     await sendMessage(
