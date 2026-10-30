@@ -662,7 +662,7 @@ export default function Home() {
                       // Construct the UPI deep link ONLY at click time.
                       // This prevents the link from being visible in the page source
                       // or inspectable via DOM inspector before the user clicks.
-                      const uri = `upi://pay?pa=${EVENT.upiId}&pn=${EVENT.upiPayeeName}&am=${total}&cu=INR&tn=CSN-Pass'
+                      const uri = `upi://pay?pa=${EVENT.upiId}&pn=${EVENT.upiPayeeName}&am=${total}&cu=INR&tn=CSN-Pass`
                       window.location.href = uri
                     }}
                     disabled={total === 0}
@@ -817,7 +817,6 @@ const phonePillStyle: React.CSSProperties = {
 // Aesthetic: tonemaki-inspired — dark charcoal bg, cream cards, orange + mint
 // accents, thin borders, soft shadows, large rounded corners.
 const globalCss = `
-  @import url('https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
