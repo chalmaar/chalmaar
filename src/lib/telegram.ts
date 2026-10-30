@@ -88,27 +88,53 @@ export interface TelegramUpdate {
 }
 
 // ─── Bot API methods ───────────────────────────────────────────────────────
+// tgPost with RETRY LOGIC — handles Render free-tier ETIMEDOUT errors
+// by retrying up to 3 times with exponential backoff (2s, 4s delays).
+// Each attempt has a 15-second timeout via AbortController.
 async function tgPost<T = unknown>(
   method: string,
   payload: Record<string, unknown>,
   formData?: FormData
 ): Promise<T> {
-  const res = formData
-    ? await fetch(apiUrl(method), { method: 'POST', body: formData })
-    : await fetch(apiUrl(method), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Telegram ${method} HTTP ${res.status}: ${text.slice(0, 300)}`)
+  const maxRetries = 3
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
+
+      const res = formData
+        ? await fetch(apiUrl(method), { method: 'POST', body: formData, signal: controller.signal })
+        : await fetch(apiUrl(method), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          })
+
+      clearTimeout(timeout)
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Telegram ${method} HTTP ${res.status}: ${text.slice(0, 300)}`)
+      }
+      const data = (await res.json()) as { ok: boolean; description?: string; result?: T }
+      if (!data.ok) {
+        throw new Error(`Telegram ${method} API error: ${data.description || 'unknown'}`)
+      }
+      return data.result as T
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt < maxRetries) {
+        const delay = 2000 * attempt
+        console.error(`[tgPost] ${method} attempt ${attempt}/${maxRetries} failed (${lastError.message}), retrying in ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
   }
-  const data = (await res.json()) as { ok: boolean; description?: string; result?: T }
-  if (!data.ok) {
-    throw new Error(`Telegram ${method} API error: ${data.description || 'unknown'}`)
-  }
-  return data.result as T
+
+  throw lastError || new Error(`Telegram ${method} failed after ${maxRetries} retries`)
 }
 
 export async function sendMessage(
