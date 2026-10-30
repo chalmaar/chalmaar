@@ -662,7 +662,7 @@ export default function Home() {
                       // Construct the UPI deep link ONLY at click time.
                       // This prevents the link from being visible in the page source
                       // or inspectable via DOM inspector before the user clicks.
-                      const uri = `upi://pay?pa=${EVENT.upiId}&pn=${encodeURIComponent(EVENT.upiPayeeName)}&am=${total}&cu=INR&tn=CSN-Pass
+                      const uri = `upi://pay?pa=${EVENT.upiId}&pn=${EVENT.upiPayeeName}&am=${total}&cu=INR&tn=CSN-Pass'
                       window.location.href = uri
                     }}
                     disabled={total === 0}
