@@ -13,7 +13,6 @@ const FALLBACK_CONFIG = {
   venue: 'TERRA Plates and Pour, Near Prozone Mall, Chh. Sambhajinagar',
   description: 'The biggest Diwali night in Chh. Sambhajinagar. Sudhanshu & Maryana headlining a high-energy set at TERRA. Pass tiers for every kind of night-owl — female, male, couple, and exclusive standing / seating tables.',
   phone1: '9923973380',
-  phone2: '8180044118',
   prices: {
     'Female Pass': 999,
     'Male Pass': 2499,
@@ -662,7 +661,7 @@ export default function Home() {
                       // Construct the UPI deep link ONLY at click time.
                       // This prevents the link from being visible in the page source
                       // or inspectable via DOM inspector before the user clicks.
-                                            const uri = `upi://pay?pa=${EVENT.upiId}&am=${total}&cu=INR'
+                      const uri = `upi://pay?pa=${EVENT.upiId}&am=${total}&cu=INR`
                       window.location.href = uri
                     }}
                     disabled={total === 0}
@@ -698,29 +697,19 @@ export default function Home() {
                       the Pay button opens your UPI app (GPay / PhonePe / Paytm) directly with the exact amount pre-filled.
                     </div>
                   )}
-                  {/* QR code — scan with UPI app as alternative to the Pay button */}
+
                   {total > 0 && (
-                    <div style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-                      padding: '16px', borderRadius: '12px', background: '#FFF', border: '1px solid rgba(20,20,20,0.1)',
-                    }}>
-                      <div style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '10px', color: '#666' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px', borderRadius: '12px', background: '#FFF', border: '1px solid rgba(20,20,20,0.1)' }}>
+                      <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#666' }}>
                         [ OR SCAN THIS QR CODE WITH YOUR UPI APP ]
                       </div>
-                      <img
-                        src={`/api/qr?pa=${EVENT.upiId}&am=${total}`}
-                        alt="UPI Payment QR Code"
-                        style={{ width: '200px', height: '200px', borderRadius: '8px' }}
-                      />
-                      <a
-                        href={`/api/qr?pa=${EVENT.upiId}&am=${total}`}
-                        download={`csn-${tier.replace(/\s+/g, '-').toLowerCase()}-qr.png`}
-                        style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '10px', color: '#FF7145', textDecoration: 'underline' }}
-                      >
-                        ⬇ Download QR Code
+                      <img src={'/api/qr?pa=' + EVENT.upiId + '&am=' + total} alt="UPI QR Code" style={{ width: '200px', height: '200px', borderRadius: '8px' }} />
+                      <a href={'/api/qr?pa=' + EVENT.upiId + '&am=' + total} download={'csn-' + (tier ? tier.replace(/\s+/g, '-').toLowerCase() : 'pass') + '-qr.png'} style={{ fontFamily: 'monospace', fontSize: '10px', color: '#FF7145', textDecoration: 'underline' }}>
+                        Download QR Code
                       </a>
                     </div>
                   )}
+
                   <div style={{
                     fontFamily: '"IBM Plex Mono", monospace',
                     fontSize: '10px', color: '#888', lineHeight: 1.5, textAlign: 'center',
