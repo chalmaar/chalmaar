@@ -698,7 +698,29 @@ export default function Home() {
                       the Pay button opens your UPI app (GPay / PhonePe / Paytm) directly with the exact amount pre-filled.
                     </div>
                   )}
-
+                  {/* QR code — scan with UPI app as alternative to the Pay button */}
+                  {total > 0 && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                      padding: '16px', borderRadius: '12px', background: '#FFF', border: '1px solid rgba(20,20,20,0.1)',
+                    }}>
+                      <div style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '10px', color: '#666' }}>
+                        [ OR SCAN THIS QR CODE WITH YOUR UPI APP ]
+                      </div>
+                      <img
+                        src={`/api/qr?pa=${EVENT.upiId}&am=${total}`}
+                        alt="UPI Payment QR Code"
+                        style={{ width: '200px', height: '200px', borderRadius: '8px' }}
+                      />
+                      <a
+                        href={`/api/qr?pa=${EVENT.upiId}&am=${total}`}
+                        download={`csn-${tier.replace(/\s+/g, '-').toLowerCase()}-qr.png`}
+                        style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: '10px', color: '#FF7145', textDecoration: 'underline' }}
+                      >
+                        ⬇ Download QR Code
+                      </a>
+                    </div>
+                  )}
                   <div style={{
                     fontFamily: '"IBM Plex Mono", monospace',
                     fontSize: '10px', color: '#888', lineHeight: 1.5, textAlign: 'center',
